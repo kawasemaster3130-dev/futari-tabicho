@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#ff5fa2">
 <title>ふたりの旅帖</title>
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob: https://cyberjapandata.gsi.go.jp https://tile.openstreetmap.org; connect-src 'self' data: blob:; worker-src 'self'; manifest-src 'self'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob: https://cyberjapandata.gsi.go.jp https://tile.openstreetmap.org; connect-src 'self' data: blob: https://nominatim.openstreetmap.org https://msearch.gsi.go.jp;worker-src 'self'; manifest-src 'self'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="strict-origin">
 <meta name="robots" content="noindex, nofollow, noarchive, noimageindex">
 <meta name="googlebot" content="noindex, nofollow"><link rel="manifest" href="manifest.webmanifest">
@@ -201,6 +201,10 @@ body[data-mode="page"] #mapstage,body[data-mode="page"] .sheet{display:none}
 .seg button{flex:1;font:inherit;font-weight:900;font-size:.88rem;border:2.5px solid var(--ink);background:var(--surface);color:var(--muted);padding:6px 8px;border-radius:99px;cursor:pointer}
 .seg button[aria-selected="true"]{background:var(--ink);color:var(--bg)}
 .dayh{display:flex;align-items:baseline;gap:8px;margin:18px 0 8px}
+.route-bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 10px 44px}.route-bar a.btn{text-decoration:none}
+.bulk-list{display:grid;gap:8px;margin:6px 0 10px}.bulk-item{border:2.5px solid var(--ink);border-radius:16px;padding:8px 10px;background:var(--card,#fff)}
+.bulk-item input{width:100%;font-weight:700}.bulk-item .row{margin-top:4px;align-items:center}.bulk-item .row .sp{flex:1}
+.bulk-item.b-ok{border-color:var(--mint,#3cc9a0)}.bulk-item.b-rough,.bulk-item.b-need{border-style:dashed}.bulk-item.b-none,.bulk-item.b-far{opacity:.85;border-style:dashed}
 .dayh .dn{font-family:var(--num);font-weight:700;background:var(--pink);color:#fff;border:2px solid var(--ink);border-radius:10px;padding:0 8px;font-size:.84rem}
 .dayh .dd{font-family:var(--pop-font);font-size:.98rem}
 .step{display:grid;grid-template-columns:34px 1fr;gap:10px;margin-bottom:12px;position:relative}
@@ -717,8 +721,10 @@ function viewPlan(t){
   for(const p of ps){const k=p.day||'';if(!groups.has(k))groups.set(k,[]);groups.get(k).push(p)}
   const keys=[...groups.keys()].sort((a,b)=>(a||'9999').localeCompare(b||'9999'));if(!keys.length)keys.push('');
   return `<p class="note">計画は「予定」です。行ったかどうか（★行った！・○予定・☆候補・–見送り）は、ふたりが押すまで変わりません。</p>
-  ${keys.map(k=>{const items=(groups.get(k)||[]).sort((a,b)=>(a.order??0)-(b.order??0)||(a.plannedTime||'99').localeCompare(b.plannedTime||'99'));const n=days.indexOf(k);
+  <button class="btn pink" data-act="bulk" data-id="${t.id}" style="margin:4px 0 6px">${ic('note')}リンクや名前をまとめて貼りつけ</button>
+  ${keys.map(k=>{const items=(groups.get(k)||[]).sort(planSort);const n=days.indexOf(k),nc=items.filter(hasCoord).length,dir=gdirLink(items);
   return `<section><div class="dayh">${k?`${n>=0?`<span class="dn">DAY ${n+1}</span>`:''}<span class="dd">${fmtMD(k)}</span>`:'<span class="dd">日付未定・行きたいところ</span>'}<span class="meta" style="margin-left:auto">${items.length}か所</span></div>
+   ${nc>=2?`<div class="route-bar">${nc>=3?`<button class="btn small mint" data-act="route-sort" data-id="${t.id}|${k}">${ic('map')}近い順に並べる</button>`:''}<a class="btn small" href="${esc(dir)}" target="_blank" rel="noopener noreferrer">${ic('pin')}Google マップでルート${ic('ext')}</a><span class="meta">直線で約${fmtKm(routeKm(items.filter(hasCoord)))}km${nc>11?'（ルートは先頭11か所まで）':''}</span></div>`:''}
    ${items.map((p,i)=>planItem(p,i,items.length)).join('')}
    <button class="add-line" data-act="place-new" data-id="${t.id}|${k}">${ic('plus')}${k?'この日に行き先を追加':'行きたいところを追加'}</button></section>`}).join('')}`;
 }
@@ -1158,6 +1164,74 @@ function quickSheet(){
   <button class="tcard add" style="margin-top:12px;margin-bottom:0" data-act="trip-new">${ic('plus')}新しい旅をつくる</button>
   <div class="row end" style="margin-top:12px"><button class="btn" data-act="dlg-cancel">閉じる</button></div>`);
 }
+/* --- まとめて貼りつけ・近い順ルート --- */
+const BULK={tid:'',items:[]};
+const planSort=(a,b)=>(a.order??0)-(b.order??0)||(a.plannedTime||'99').localeCompare(b.plannedTime||'99');
+function gmapInfo(u){ // 長い Google マップ URL から名前と座標を読む（短縮 URL は中身が見えないので読めない）
+  let name='';const n=u.match(/\/maps\/place\/([^/@?]+)/);if(n)try{name=decodeURIComponent(n[1].replace(/\+/g,' ')).trim()}catch{}
+  const m=u.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/)||u.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/)||u.match(/[?&](?:q|query|ll|center|destination)=(-?\d+\.\d+)(?:,|%2C)\s*(-?\d+\.\d+)/i);
+  return{name,lat:m?Number(m[1]):null,lng:m?Number(m[2]):null};
+}
+function parseBulk(text){
+  const out=[];let pend=null; // 直前の名前だけの行。すぐ次の行がリンクなら、ひと組にする
+  for(const raw of text.split(/\r?\n/)){
+    const line=raw.trim();if(!line){pend=null;continue}
+    const urls=(line.match(/https?:\/\/\S+/g)||[]).filter(u=>safeUrl(u)),label=line.replace(/https?:\/\/\S+/g,'').trim();
+    if(!urls.length){pend={name:label,url:'',lat:null,lng:null};out.push(pend);continue}
+    urls.forEach((u,i)=>{const g=gmapInfo(u);
+      if(i===0&&!label&&pend){pend.url=u;if(g.lat!=null){pend.lat=g.lat;pend.lng=g.lng}if(!pend.name)pend.name=g.name}
+      else out.push({name:g.name||(i===0?label:''),url:u,lat:g.lat,lng:g.lng})});
+    pend=null;
+  }
+  return out.map(x=>({...x,name:x.name.slice(0,80),address:'',state:x.lat!=null?'ok':x.name?'find':'need'}));
+}
+async function geocode(q){ // 送るのは場所の名前だけ。OpenStreetMap で探し、なければ国土地理院でだいたいの場所
+  try{const j=await(await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=jp&accept-language=ja&q=${encodeURIComponent(q)}`)).json();
+    if(j[0]){const parts=j[0].display_name.split(',').map(s=>s.trim()).slice(1).filter(s=>s!=='日本'&&!/^\d{3}-?\d{4}$/.test(s));return{lat:+j[0].lat,lng:+j[0].lon,address:parts.reverse().join('').slice(0,160),rough:false}}}catch{}
+  try{const j=await(await fetch(`https://msearch.gsi.go.jp/address-search/AddressSearch?q=${encodeURIComponent(q)}`)).json();
+    if(j[0])return{lat:j[0].geometry.coordinates[1],lng:j[0].geometry.coordinates[0],address:j[0].properties.title,rough:true}}catch{}
+  return null;
+}
+const BULK_ST={ok:'場所OK',rough:'だいたいの場所（あとで直してね）',find:'さがし中…',none:'見つからず（地図には出ません）',far:'同じ名前の遠い場所しか見つかりませんでした（地図には出ません。あとで地図をタップして入れられます）',need:'リンクだけでは場所が読めません。名前を入れて「名前でさがす」を押してね'};
+function bulkRow(x,i){const u=safeUrl(x.url);return `<div class="bulk-item b-${x.state}"><input data-bulk="${i}" value="${esc(x.name)}" maxlength="80" aria-label="${i+1}つ目の名前" placeholder="場所の名前">
+  <div class="meta">${BULK_ST[x.state]}${x.address?' · '+esc(x.address):''}</div>
+  <div class="row">${u?`<a href="${esc(u)}" target="_blank" rel="noopener noreferrer">${ic('pin')}リンクを開く${ic('ext')}</a>`:''}<span class="sp"></span>${x.state!=='ok'&&x.state!=='find'?`<button type="button" class="btn small" data-act="bulk-find" data-id="${i}">${ic('search')}名前でさがす</button>`:''}<button type="button" class="iconbtn" data-act="bulk-drop" data-id="${i}" aria-label="${i+1}つ目を外す">${ic('trash')}</button></div></div>`}
+function bulkRender(){const el=$('#bulk-list');if(!el)return;el.innerHTML=BULK.items.map(bulkRow).join('');const b=$('#bulk-add');if(b){const n=BULK.items.filter(x=>x.name.trim()).length;b.disabled=!n||BULK.items.some(x=>x.state==='find');b.lastChild.textContent=n?`${n}か所を追加`:'追加する'}}
+async function bulkFind(list){
+  for(const x of list){if(!x.name.trim()){x.state='need';continue}x.state='find';bulkRender();
+    const r=await geocode(x.name.trim());
+    // 同じ名前の遠い場所を拾うことがあるので、旅のほかの場所から150km以上離れていたら使わない
+    const near=[...livePlaces(BULK.tid).filter(hasCoord),...BULK.items.filter(y=>y!==x&&y.state==='ok')];
+    if(r&&near.length&&Math.min(...near.map(p=>hav(p,r)))>150)x.state='far';
+    else if(r)Object.assign(x,{lat:r.lat,lng:r.lng,address:r.address,state:r.rough?'rough':'ok'});else x.state='none';bulkRender();
+    await new Promise(z=>setTimeout(z,1100))} // OpenStreetMap の約束（1秒に1回まで）
+}
+function bulkForm(tid){BULK.tid=tid;BULK.items=[];
+  openDialog(`<div class="row">${piko('wow',52)}<div><span class="eyebrow">Paste</span><h2 id="dlg-title">まとめて貼りつけ</h2></div></div>
+  <p class="note">Google マップのリンクや場所の名前を、1行に1つずつ貼ってね。名前のすぐ次の行にリンクがあれば、ひと組として読みます。</p>
+  <label>行きたいところ<textarea id="bulk-text" rows="6" placeholder="旅館 深雪温泉&#10;https://maps.app.goo.gl/…&#10;リゾナーレ八ヶ岳"></textarea></label>
+  <p class="note">場所が分からないものは、<b>場所の名前だけ</b>を OpenStreetMap と国土地理院の検索に問い合わせます。写真や記録は送りません。</p>
+  <div id="bulk-list" class="bulk-list"></div>
+  <div class="row end"><button type="button" class="btn" data-act="dlg-cancel">キャンセル</button><button type="button" class="btn" data-act="bulk-read">${ic('search')}読み取る</button><button type="button" class="btn pink" data-act="bulk-add" id="bulk-add" disabled>${ic('plus')}<span>追加する</span></button></div>`);
+  $('#bulk-list').addEventListener('input',e=>{const i=e.target.dataset.bulk;if(i!=null){BULK.items[i].name=e.target.value;const b=$('#bulk-add');const n=BULK.items.filter(x=>x.name.trim()).length;if(b){b.disabled=!n||BULK.items.some(x=>x.state==='find');b.lastChild.textContent=n?`${n}か所を追加`:'追加する'}}});
+}
+function nearOrder(ps){ // 先頭の場所から近い順にたどり、交差するところはほどく（直線距離で）
+  const c=ps.filter(hasCoord),rest=ps.filter(p=>!hasCoord(p));if(c.length<3)return[...c,...rest];
+  const r=[c[0]],left=c.slice(1);
+  while(left.length){const a=r[r.length-1];let k=0;left.forEach((p,i)=>{if(hav(a,p)<hav(a,left[k]))k=i});r.push(left.splice(k,1)[0])}
+  for(let better=true,n=0;better&&n<50;n++){better=false;
+    for(let i=1;i<r.length-1;i++)for(let j=i+1;j<r.length;j++){const a=r[i-1],b=r[i],e=r[j],d=r[j+1];
+      if(hav(a,e)+(d?hav(b,d):0)+1e-9<hav(a,b)+(d?hav(e,d):0)){r.splice(i,j-i+1,...r.slice(i,j+1).reverse());better=true}}
+    // 寄り道になっている1か所を、いちばん近道になる位置へ入れ直す
+    for(let k=1;k<r.length;k++){const base=routeKm(r),p=r.splice(k,1)[0];let best=k,bk=base;
+      for(let m=1;m<=r.length;m++){r.splice(m,0,p);const km=routeKm(r);if(km+1e-9<bk){bk=km;best=m}r.splice(m,1)}
+      r.splice(best,0,p);if(best!==k)better=true}}
+  return[...r,...rest];
+}
+function gdirLink(ps){ // Google マップのルート案内（出発・到着＋経由地は9か所まで）
+  const c=ps.filter(hasCoord).slice(0,11);if(c.length<2)return'';const ll=p=>`${p.lat},${p.lng}`,mid=c.slice(1,-1);
+  return `https://www.google.com/maps/dir/?api=1&origin=${ll(c[0])}&destination=${ll(c[c.length-1])}${mid.length?'&waypoints='+encodeURIComponent(mid.map(ll).join('|')):''}&travelmode=driving`;
+}
 function newPlace(tid,day){const t=tripOf(tid);placeForm({id:uid(),tripId:tid,name:'',note:'',article:'',day:day||'',plannedTime:'',status:day?'planned':'candidate',address:'',lat:null,lng:null,mapUrl:'',officialUrl:'',visitedDate:'',visitedTime:'',visitedTz:t.tz,source:'self',checkedAt:'',memo:''},true)}
 
 /* ===== 保存処理 ===== */
@@ -1474,6 +1548,25 @@ const ACT={
   sub:id=>{S.sub=id;render()},
   'step-new':tid=>{const t=tripOf(tid),today=nowIn(t.tz||DEFAULT_TZ).date;newPlace(tid,tripDays(t).includes(today)?today:'')},
   'place-new':v=>{const[tid,day]=v.split('|');newPlace(tid,day)},
+  bulk:tid=>bulkForm(tid),
+  'bulk-read':()=>{const items=parseBulk($('#bulk-text').value);if(!items.length)return toast('リンクか名前を貼ってね',true);
+    BULK.items.push(...items);$('#bulk-text').value='';dlgDirty=true;bulkRender();bulkFind(items.filter(x=>x.state==='find'))},
+  'bulk-find':i=>{const x=BULK.items[i];if(!x.name.trim())return toast('名前を入れてね',true);bulkFind([x])},
+  'bulk-drop':i=>{BULK.items.splice(Number(i),1);bulkRender()},
+  'bulk-add':async()=>{
+    const tid=BULK.tid,t=tripOf(tid),list=BULK.items.filter(x=>x.name.trim());if(!t||!list.length)return;
+    const base=Math.max(0,...livePlaces(tid).filter(p=>!p.day).map(p=>(p.order??0)+10));
+    const ps=list.map((x,i)=>({id:uid(),tripId:tid,name:x.name.trim(),note:'',article:'',day:'',plannedTime:'',status:'candidate',address:x.address||'',lat:x.lat??null,lng:x.lng??null,
+      mapUrl:safeUrl(x.url)||'',officialUrl:'',visitedDate:'',visitedTime:'',visitedTz:t.tz,source:'self',checkedAt:'',memo:x.state==='rough'?'場所は名前からのだいたいの位置です。地図で確かめてね。':'',
+      order:base+i*10,createdAt:now(),updatedAt:now(),deletedAt:null}));
+    try{await tx(['places'],x=>ps.forEach(o=>x.objectStore('places').put(o)))}catch(e){return toast(saveErr(e),true)}
+    ps.forEach(o=>upsert('places',o));dlgDirty=false;closeDialog();S.sub='plan';render();
+    toast(`${ps.length}か所を「日付未定・行きたいところ」に追加しました${ps.filter(hasCoord).length>=3?'。「近い順に並べる」でルートにできます':''}`)},
+  'route-sort':async v=>{
+    const[tid,k]=v.split('|'),g=livePlaces(tid).filter(x=>(x.day||'')===k).sort(planSort),r=nearOrder(g);
+    const upd=r.map((x,i)=>({...x,order:i*10,updatedAt:now()}));
+    try{await tx(['places'],x=>upd.forEach(o=>x.objectStore('places').put(o)))}catch(e){return toast(saveErr(e),true)}
+    upd.forEach(o=>upsert('places',o));render();toast(`いちばん上の場所から近い順に並べました（直線で約${fmtKm(routeKm(r.filter(hasCoord)))}km）。出発地を変えたいときは、その場所を一番上にしてからもう一度押してね`)},
   'place-edit':id=>placeForm(structuredClone(placeOf(id)),false),
   'place-visit':id=>visitForm(placeOf(id)),
   'place-del':id=>softDelete('places',id,placeOf(id).name,'この場所に結びついた記録は残ります。'),

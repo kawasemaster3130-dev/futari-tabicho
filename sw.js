@@ -1,6 +1,6 @@
 // ふたりの旅帖 PWA: アプリ本体を端末に置き、オフラインでも開けるようにする。
 // 記録そのものは IndexedDB（端末の中）にあり、ここでは扱わない。
-const VERSION = '20261101171504';
+const VERSION = '20261101172256';
 const CORE = 'tabicho-core-' + VERSION;
 const RUNTIME = 'tabicho-runtime';
 const FILES = ['./', './index.html', './leaflet.min.js', './fonts.css', './manifest.webmanifest',
