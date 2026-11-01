@@ -1,4 +1,5 @@
 {
+  "id": "./",
   "name": "ふたりの旅帖",
   "short_name": "旅帖",
   "lang": "ja",
@@ -6,7 +7,6 @@
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "orientation": "portrait",
   "background_color": "#1f1530",
   "theme_color": "#1f1530",
   "icons": [
@@ -21,12 +21,6 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
-    },
-    {
-      "src": "icons/icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "maskable"
     }
   ]
 }
