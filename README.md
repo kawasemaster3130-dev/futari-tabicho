@@ -13,5 +13,5 @@
 
 - 地図ライブラリ: Leaflet（BSD-2-Clause）
 - 陸地データ: Natural Earth（public domain）
-- フォント: Fredoka / Mochiy Pop One / Zen Maru Gothic（SIL Open Font License 1.1）
+- フォント: Zen Kaku Gothic New / Shippori Mincho B1 / Barlow Condensed（SIL Open Font License 1.1）
 - ライセンスの全文: THIRD_PARTY_LICENSES.txt（アプリの「設定」からも開けます）
