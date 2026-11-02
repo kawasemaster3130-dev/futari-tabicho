@@ -33,12 +33,15 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
-2. Fonts (fonts/ / 文字): Barlow Condensed, Shippori Mincho B1, Zen Kaku Gothic New
+2. Fonts (fonts/ / 文字): Barlow Condensed, Fredoka, Mochiy Pop One, Shippori Mincho B1, Zen Kaku Gothic New, Zen Maru Gothic
 ------------------------------------------
 
 Barlow Condensed: Copyright The Barlow Condensed Project Authors. Licensed under the SIL Open Font License, Version 1.1.
+Fredoka: Copyright The Fredoka Project Authors. Licensed under the SIL Open Font License, Version 1.1.
+Mochiy Pop One: Copyright The Mochiy Pop One Project Authors. Licensed under the SIL Open Font License, Version 1.1.
 Shippori Mincho B1: Copyright The Shippori Mincho B1 Project Authors. Licensed under the SIL Open Font License, Version 1.1.
 Zen Kaku Gothic New: Copyright The Zen Kaku Gothic New Project Authors. Licensed under the SIL Open Font License, Version 1.1.
+Zen Maru Gothic: Copyright The Zen Maru Gothic Project Authors. Licensed under the SIL Open Font License, Version 1.1.
 
 This Font Software is licensed under the SIL Open Font License, Version 1.1.
 This license is copied below, and is also available with a FAQ at: https://openfontlicense.org
